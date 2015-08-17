@@ -1,0 +1,51 @@
+# Maintainer: onefire <onefire.myself@gmail.com>
+pkgname=('opencl-nvidia-custom')
+pkgver=331.20
+pkgrel=1
+pkgdesc="OpenCL implemention for NVIDIA. Customized to be compatible with libgl. This and my package nvidia-utils-custom are broken down in two packages because the AUR does not support multiple packages per PKGBUILD."
+depends=('libcl' 'zlib' "nvidia-utils")
+optdepends=('opencl-headers: headers necessary for OpenCL development')
+arch=('i686' 'x86_64')
+url="http://www.nvidia.com/"
+license=('custom')
+options=('!strip')
+provides=("opencl-nvidia=$pkgver")
+conflicts=('opencl-nvidia')
+groups=('nvidia-cuda' 'custom')
+
+if [ "$CARCH" = "i686" ]; then
+	_arch='x86'
+	_pkg="NVIDIA-Linux-${_arch}-${pkgver}"
+	sha512sums=("e42cfdcceba7f590e0fa6d8a99bf0c80143dc5bf5af21f26ce65274426c4eb3dbd1ec6864bf4edfcfd6f463453f06f44fd67acfcdd545764741a9620381865d2")
+
+elif [ "$CARCH" = "x86_64" ]; then
+	_arch='x86_64'
+	_pkg="NVIDIA-Linux-${_arch}-${pkgver}-no-compat32"
+	sha512sums=("7ed5add554b9d86c0b0b79ddc122db088e0637897be9e8c98a3dab8f1ee467a07970ba1d5f652efd201c6f0bff37a183faf8b167a1ccc61c339becd74f13e303")
+fi
+
+source=("ftp://download.nvidia.com/XFree86/Linux-${_arch}/${pkgver}/${_pkg}.run")
+
+create_links() {
+  # create soname links
+  while read -d '' _lib; do
+    _soname="$(dirname "${_lib}")/$(readelf -d "${_lib}" | sed -nr 's/.*Library soname: \[(.*)\].*/\1/p')"
+    [[ -e "${_soname}" ]] || ln -s "$(basename "${_lib}")" "${_soname}"
+    [[ -e "${_soname/.[0-9]*/}" ]] || ln -s "$(basename "${_soname}")" "${_soname/.[0-9]*/}"
+  done < <(find "${pkgdir}" -type f -name '*.so*' -print0)
+}
+
+build() {
+  cd "${srcdir}"
+  sh "$_pkg.run" --extract-only
+}
+
+package() {
+  cd "${srcdir}/$_pkg"
+
+  install -D -m644 nvidia.icd "${pkgdir}/etc/OpenCL/vendors/nvidia.icd"
+  install -D -m755 "libnvidia-opencl.so.${pkgver}" "${pkgdir}/usr/lib/libnvidia-opencl.so.${pkgver}"
+  install -D -m755 "libnvidia-compiler.so.${pkgver}" "${pkgdir}/usr/lib/libnvidia-compiler.so.${pkgver}"
+ 
+  create_links
+}
